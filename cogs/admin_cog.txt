@@ -1,0 +1,62 @@
+import discord
+from discord.ext import commands
+
+
+class AdminCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @commands.command(name="deleta", help="Deleta as últimas mensagens do canal.")
+    @commands.has_permissions(manage_messages=True)
+    async def deleta(self, ctx, limit: int = 1):
+        try:
+            # Deleta as mensagens especificadas pelo usuário
+            deleted = await ctx.channel.purge(limit=limit + 1)  # +1 para incluir o comando
+            await ctx.send(f"{len(deleted) - 1} mensagens deletadas.")  # Subtrai 1 para não contar o comando
+        except discord.Forbidden:
+            await ctx.send("Não tenho permissão para deletar mensagens.")
+        except discord.HTTPException:
+            await ctx.send("Ocorreu um erro ao tentar deletar mensagens.")
+        except Exception as e:
+            await ctx.send(f"Ocorreu um erro: {str(e)}")
+
+    @commands.command(name="nuke", help="Clona o canal e deleta o original.")
+    @commands.has_permissions(manage_channels=True)
+    async def nuke(self, ctx):
+        try:
+            original_channel = ctx.channel
+            await ctx.send("Iniciando o processo de nuke...")  # Mensagem de debug
+
+            # Verifica as permissões
+            if not ctx.guild.me.guild_permissions.manage_channels:
+                await ctx.send("Não tenho permissão para gerenciar canais.")
+                return
+
+            overwrites = original_channel.overwrites
+
+            # Criando o novo canal com as mesmas configurações
+            new_channel = await ctx.guild.create_text_channel(
+                name=original_channel.name,
+                overwrites=overwrites,
+                category=original_channel.category,  # Mantém a mesma categoria
+                topic=original_channel.topic,
+                nsfw=original_channel.nsfw,
+                slowmode_delay=original_channel.slowmode_delay
+            )
+
+            await ctx.send(f"Canal {original_channel.name} clonado como {new_channel.name}.")  # Mensagem de debug
+
+            await new_channel.send("Este canal foi clonado! O canal original foi deletado.")
+            await original_channel.delete()
+            await ctx.send(f"O canal {original_channel.name} foi deletado e clonado para {new_channel.name}.")
+        except discord.Forbidden:
+            await ctx.send("Não tenho permissão para gerenciar canais.")
+        except discord.HTTPException as e:
+            await ctx.send(f"Ocorreu um erro ao tentar clonar o canal: {str(e)}")
+        except Exception as e:
+            await ctx.send(f"Ocorreu um erro inesperado: {str(e)}")
+
+
+# Configurando o Cog no bot
+async def setup(bot):
+    await bot.add_cog(AdminCog(bot))
